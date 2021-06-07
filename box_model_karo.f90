@@ -24,23 +24,23 @@ IMPLICIT NONE
 
   
   ! parameters from input file
-  REAL(dp),ALLOCATABLE,DIMENSION(:)		:: time, lev, lat, lon
-  REAL(dp),ALLOCATABLE,DIMENSION(:,:,:)         :: spress,sz
+  REAL(dp),ALLOCATABLE,DIMENSION(:)		:: time, lev, lat, lon, hyam, hybm
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: press, temp, spechum
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: mixratio_SSs, mixratio_SSm, mixratio_SSl
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: mixratio_DUs, mixratio_DUm, mixratio_DUl
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: mixratio_OMh, mixratio_OMn
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: mixratio_BCh, mixratio_BCn  
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: mixratio_SU
-  
+  REAL(dp),ALLOCATABLE,DIMENSION(:,:,:)         :: SP
 
   ! parameters for output file  
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: VarCCN_01, VarCCN_02, VarCCN_03
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)       :: VarCCN_04, VarCCN_05, VarCCN_06
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)       :: VarCCN_07, VarCCN_08, VarCCN_09
   REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)       :: VarCCN_10
-!--msh
-  REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: geop
+  REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)       :: VarCCN_ss_02, VarCCN_ss_04, VarCCN_ss_05
+  REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)       :: VarCCN_ss_06, VarCCN_ss_08, VarCCN_ss_1
+! REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: VarCCN_02_SSs, VarCCN_02_SSm, VarCCN_02_SSl
 ! REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: VarCCN_02_OMh, VarCCN_02_BCh, VarCCN_02_SU
 
 ! REAL(dp),ALLOCATABLE,DIMENSION(:,:,:,:)	:: VarCCN_04_SSs, VarCCN_04_SSm, VarCCN_04_SSl
@@ -65,10 +65,7 @@ IMPLICIT NONE
   ! Local parameters
   INTEGER				:: ig, it, la, lo, jclass
   INTEGER				:: missflag, nt, ncd_activ=2
-  !msh
-  INTEGER                               :: vr
-  REAL(dp)                              :: pratio(kbdim,klev), tavg(kbdim,klev)
-!  REAL(dp)                              :: a(kbdim,klev), b(kbdim,klev)
+
 
   REAL(dp):: 	ptm1(kbdim,klev), 	&
 		papm1(kbdim,klev), 	&
@@ -76,10 +73,7 @@ IMPLICIT NONE
 		pesw(kbdim,klev), 	&		
 		prho(kbdim,klev),	&
 		prho_dry(kbdim,klev)
-  
-  REAL(dp)::    psp1(kbdim),            &
-                pz1(kbdim)
-       
+
   REAL(dp):: 	mmr_tot(kbdim,klev,nmod),	&
   		mconc(kbdim,klev,nmod),		&
 		nconc(kbdim,klev,nmod),		&
@@ -113,8 +107,8 @@ IMPLICIT NONE
 !-------------------------------------------------------------------------------
 !--- read input statements:
 
-  WRITE(*,*) ' '    
-  WRITE(*,*) 'BOXFILE SETTINGS:'
+  !WRITE(*,*) ' '    
+  !WRITE(*,*) 'BOXFILE SETTINGS:'
   
 !  CALL read_input(ifilename1, ifilename2, ifilename3, ifilename4, &
 !  			ofilename1, ofilename2, ofilename3, year, mon)
@@ -152,8 +146,8 @@ IMPLICIT NONE
 !-------------------------------------------------------------------------------
 !--- get netCDF data dimensions from reanalysis:
 
-  WRITE(*,*) ' '
-  WRITE(*,*) 'NETCDF INPUT DIMENSIONS:' 
+  !WRITE(*,*) ' '
+  !WRITE(*,*) 'NETCDF INPUT DIMENSIONS:' 
 
   CALL netcdf_dimensions(ifile2, nTimes, nLev, nLat, nLon)
   
@@ -165,15 +159,16 @@ IMPLICIT NONE
 
 !-------------------------------------------------------------------------------
 !--- get netCDF data parameters from reanalysis:  
-  WRITE(*,*) ' '     
-  WRITE(*,*) 'READING INPUT DATA'
+  !WRITE(*,*) ' '     
+  !WRITE(*,*) 'READING INPUT DATA'
 
   ALLOCATE(time(nTimes))
   ALLOCATE(lev(nLev))
   ALLOCATE(lat(nLat))
   ALLOCATE(lon(nLon))
-  ALLOCATE(spress(nLon, nLat, nTimes))
-  ALLOCATE(sz(nLon, nLat, nTimes))
+  ALLOCATE(hyam(nLev))
+  ALLOCATE(hybm(nLev))
+  ALLOCATE(SP(nLon, nLat, nTimes))
   ALLOCATE(press(nLon, nLat, nLev, nTimes))
   ALLOCATE(temp(nLon, nLat, nLev, nTimes))  
   ALLOCATE(spechum(nLon, nLat, nLev, nTimes))    
@@ -188,13 +183,11 @@ IMPLICIT NONE
   ALLOCATE(mixratio_BCn(nLon, nLat, nLev, nTimes))
   ALLOCATE(mixratio_BCh(nLon, nLat, nLev, nTimes))
   ALLOCATE(mixratio_SU(nLon, nLat, nLev, nTimes))
-  !--msh
-  ALLOCATE(geop(nLon, nLat, nLev, nTimes))
   
 
   CALL netcdf_input(ifile1, ifile2, &
-  		    nTimes, nLev, nLat, nLon, time, lev, lat, lon, &
-  		    spress,sz,press, temp, spechum, mixratio_SSs, mixratio_SSm, mixratio_SSl, &
+  		    nTimes, nLev, nLat, nLon, time, lev, lat, lon, hyam, hybm, &
+  		    SP, press, temp, spechum, mixratio_SSs, mixratio_SSm, mixratio_SSl, &
   		    mixratio_DUs, mixratio_DUm, mixratio_DUl, &
   		    mixratio_OMn, mixratio_OMh, mixratio_BCn, mixratio_BCh, mixratio_SU)
 
@@ -202,8 +195,8 @@ IMPLICIT NONE
 !-------------------------------------------------------------------------------
 !--- Allocate most of the Output:
 
-  WRITE(*,*) ' '     
-  WRITE(*,*) 'START COMPUTATIONS IN LOOPS'
+  !WRITE(*,*) ' '     
+  !WRITE(*,*) 'START COMPUTATIONS IN LOOPS'
 
   ALLOCATE(VarCCN_01(nLon, nLat, nLev, nTimes))
   ALLOCATE(VarCCN_02(nLon, nLat, nLev, nTimes))
@@ -215,6 +208,13 @@ IMPLICIT NONE
   ALLOCATE(VarCCN_08(nLon, nLat, nLev, nTimes))
   ALLOCATE(VarCCN_09(nLon, nLat, nLev, nTimes))
   ALLOCATE(VarCCN_10(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_02(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_04(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_05(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_06(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_08(nLon, nLat, nLev, nTimes))
+  ALLOCATE(VarCCN_ss_1(nLon, nLat, nLev, nTimes))
+  
 ! ALLOCATE(VarCCN_02(nLon, nLat, nLev, nTimes))
 ! ALLOCATE(VarCCN_02_SSs(nLon, nLat, nLev, nTimes))   
 ! ALLOCATE(VarCCN_02_SSm(nLon, nLat, nLev, nTimes))    
@@ -274,10 +274,10 @@ IMPLICIT NONE
  DO lo = 1,nLon 
   DO la = 1,nLat
    !WRITE(*,*) 'lon',lo, 'lat',la  
-   DO it = 1,nTimes
-    DO ig = 1,nLev
+   DO ig = 1,nLev
+    DO it = 1,nTimes
     WRITE(*,*) ' '
-    WRITE(*,*) 'nt: ',nt
+    !WRITE(*,*) 'nt: ',nt
     WRITE(*,*) 'lon',lo, 'lat',la, 'lev',ig, 'time',it
  
 !-------------------------------------------------------------------------------
@@ -304,6 +304,7 @@ IMPLICIT NONE
       ptm1(kbdim,klev) = temp(lo,la,ig,it) 		! temperature [K]
       papm1(kbdim,klev) = press(lo,la,ig,it)		! pressure [Pa]
       pqm1(kbdim,klev) = spechum(lo,la,ig,it)		! specific humidity [kg/kg]
+
       IF(ptm1(kbdim,klev) .LT. tlbound) THEN
         ptm1(kbdim,klev) = 280.0_dp
         papm1(kbdim,klev) = 100000.0_dp      
@@ -317,19 +318,8 @@ IMPLICIT NONE
       IF(it .EQ. 1 .AND. ig .EQ. 1 .AND. la .EQ. 1 .AND. lo .EQ. 1) THEN  
         CALL get_input_sub(jptlucu1,jptlucu2,tlucuaw)
       ENDIF 
-      !----------------------------------geopotential------------------------------------
-      vr=nlev-(ig-1)
-      IF(vr .EQ. nlev) THEN
-         geop(lo,la,vr,it) = sz(lo,la,it)/g
-         
-      ELSE
-         tavg(kbdim,klev) = (temp(lo,la,vr,it)+temp(lo,la,vr+1,it))/2.0
-         pratio(kbdim,klev)=press(lo,la,vr,it)/press(lo,la,vr+1,it)
-        ! a(kbdim,klev)=(rd*tavg(kbdim,klev))/g
-        ! b(kbdim,klev)=log(pratio(kbdim,klev))
-         geop(lo,la,vr,it) = geop(lo,la,vr+1,it)-(((rd*tavg(kbdim,klev))/g)*(log(pratio(kbdim,klev))))
-      ENDIF
-      !--------------------------------------------------------------------------------
+           
+      
       CALL get_input_para(tlucuaw,jptlucu1,jptlucu2,ptm1,papm1,pqm1,pesw,prho,prho_dry)
 
      ! DO jclass = 1,nmod
@@ -421,7 +411,13 @@ IMPLICIT NONE
         VarCCN_10(lo,la,ig,it) = -9999.99_dp
 !   VarNC(lo,la,ig,it) = -9999.99_dp
 !   VarMC(lo,la,ig,it) = -9999.99_dp
-
+        VarCCN_ss_02(lo,la,ig,it) = -9999.99_dp
+        VarCCN_ss_04(lo,la,ig,it) = -9999.99_dp
+        VarCCN_ss_05(lo,la,ig,it) = -9999.99_dp
+        VarCCN_ss_06(lo,la,ig,it) = -9999.99_dp
+        VarCCN_ss_08(lo,la,ig,it) = -9999.99_dp
+        VarCCN_ss_1(lo,la,ig,it)  = -9999.99_dp
+        
 !   VarCCN_02_SSs(lo,la,ig,it) =  -9999.99_dp
 !   VarCCN_04_SSs(lo,la,ig,it) =  -9999.99_dp        
 !   VarCCN_10_SSs(lo,la,ig,it) =  -9999.99_dp    
@@ -486,7 +482,14 @@ IMPLICIT NONE
      VarCCN_10(lo,la,ig,it) = pcdncact(kbdim,klev,10)
      
 !   VarMC(lo,la,ig,it) = SUM(mconc(kbdim,klev,:))
-!   VarNC(lo,la,ig,it) = SUM(nconc(kbdim,klev,:))			
+!   VarNC(lo,la,ig,it) = SUM(nconc(kbdim,klev,:))
+     VarCCN_ss_02(lo,la,ig,it) = ccnsum(kbdim,klev,8)
+     VarCCN_ss_04(lo,la,ig,it) = ccnsum(kbdim,klev,17)
+     VarCCN_ss_05(lo,la,ig,it) = ccnsum(kbdim,klev,18)
+     VarCCN_ss_06(lo,la,ig,it) = ccnsum(kbdim,klev,20)
+     VarCCN_ss_08(lo,la,ig,it) = ccnsum(kbdim,klev,25)
+     VarCCN_ss_1(lo,la,ig,it)  = ccnsum(kbdim,klev,28)
+     
 !   
 !   VarCCN_02_SSs(lo,la,ig,it) = cnfrac(kbdim,klev,8,1)*nconc(kbdim,klev,1)    
 !   VarCCN_04_SSs(lo,la,ig,it) = cnfrac(kbdim,klev,17,1)*nconc(kbdim,klev,1)	     
@@ -545,10 +548,9 @@ IMPLICIT NONE
 !-------------------------------------------------------------------------------
 !--- end loop:
 
-!      nt = nt+1
-    ENDDO !ig
-    nt = nt+1
-   ENDDO !it
+      nt = nt+1
+    ENDDO !it
+   ENDDO !ig
   ENDDO !la
  ENDDO !lo
   
@@ -572,17 +574,22 @@ IMPLICIT NONE
 !			VarCCN_04_SSs, VarCCN_04_SSm, VarCCN_04_SSl, &
 !			VarCCN_04_OMh, VarCCN_04_BCh, VarCCN_04_SU, &
 !			VarCCN_10_SSs, VarCCN_10_SSm, VarCCN_10_SSl, &
-!			VarCCN_10_OMh, VarCCN_10_BCh, VarCCN_10_SU)
+ !			VarCCN_10_OMh, VarCCN_10_BCh, VarCCN_10_SU)
+
+ !WRITE(*,*) 'hyam', Hyam
   
  CALL netcdf_output(   ofile1, year, mon, &
  			nTimes, nLev, nLat, nLon, &
-			time, lev, lat, lon, &
-                        VarCCN_01, VarCCN_02, VarCCN_03, &
+			time, lev, lat, lon, hyam, hybm, &
+                        SP, VarCCN_01, VarCCN_02, VarCCN_03, &
                         VarCCN_04, VarCCN_05, VarCCN_06, &
                         VarCCN_07, VarCCN_08, VarCCN_09, &
-                        VarCCN_10,geop )
+                        VarCCN_10, VarCCN_ss_02, VarCCN_ss_04, &
+                        VarCCN_ss_05, VarCCN_ss_06, VarCCN_ss_08, &
+                        VarCCN_ss_1)
  
-
+ 
+WRITE(*,*) 'END PROGRAM'
 
 END PROGRAM box_model_karo
 
